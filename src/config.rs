@@ -103,10 +103,17 @@ impl Config {
                     }
                     sub_children.push(TreeItem::new_leaf(
                         ProjectItem::new(proj_path, ProjectItemType::Project),
-                        name
+                        name,
                     ));
                 }
-                sub_children.sort_by_key(|c| c.identifier().path.file_name().unwrap().to_string_lossy().into_owned());
+                sub_children.sort_by_key(|c| {
+                    c.identifier()
+                        .path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
+                });
 
                 children.push(
                     TreeItem::new(
@@ -123,13 +130,21 @@ impl Config {
                 );
             }
 
-            children.sort_by_key(|c| c.identifier().path.file_name().unwrap().to_string_lossy().into_owned());
+            children.sort_by_key(|c| {
+                c.identifier()
+                    .path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            });
 
             let project_dir_tree_item = TreeItem::new(
                 ProjectItem::new(path.clone(), ProjectItemType::ProjectDirectory),
                 path.file_name().unwrap().to_string_lossy().into_owned(),
-                children
-            ).unwrap();
+                children,
+            )
+            .unwrap();
 
             forest.push(project_dir_tree_item);
         }
