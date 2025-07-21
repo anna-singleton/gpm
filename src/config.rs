@@ -16,7 +16,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             project_directories: vec!["~/proj".to_string()],
-            standalone_projects: vec![],
+            standalone_projects: vec!["~/.dotfiles".to_string()],
         }
     }
 }
