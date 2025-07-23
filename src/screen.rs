@@ -1,6 +1,12 @@
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum Screen {
+    #[default]
     Main,
-    ProjectCreate,
+    CheckoutNewWorktree,
     BranchCreate,
-    Delete,
+    WorktreeDelete,
+    BranchDelete,
+    ProjectMenu,
+    ProjectWorktreeMenu,
+    ProjectDirectoryMenu,
 }
