@@ -1,11 +1,14 @@
 use std::io;
 
-use crate::{project_item::{ProjectItem, ProjectItemType}, screen::Screen};
+use crate::{project_item::{ProjectItem, ProjectItemType}, screen::{InputMode, Screen}};
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Flex, Layout, Rect}, style::{Color, Modifier, Style}, text::{Line, Span}, widgets::{Block, Clear, Paragraph, Scrollbar, ScrollbarOrientation, Widget}, DefaultTerminal, Frame
+    crossterm::event::{self, Event, KeyCode, KeyEvent},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
+    style::{Color, Modifier, Style, Stylize}, text::{Line, Span},
+    widgets::{Block, Clear, Paragraph, Scrollbar, ScrollbarOrientation, Widget}, DefaultTerminal, Frame
 };
+use tui_input::{backend::crossterm::EventHandler, Input};
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 #[derive(Debug, Default)]
@@ -14,6 +17,9 @@ pub struct App<'a> {
     tree_state: TreeState<ProjectItem>,
     app_screen: Screen,
     select_idx: u8,
+    input: Input,
+    input_mode: InputMode,
+    input_boxes: Vec<String>,
     exit: bool,
 }
 
@@ -21,20 +27,67 @@ impl<'a> App<'a> {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
-            if match event::read()? {
-                Event::Key(k) => self.handle_key_event(k),
-                _ => false
-            }
-            {
+            let e = event::read()?;
+            let should_exit = match self.input_mode {
+                InputMode::Standard => {
+                    match e {
+                        Event::Key(k) => self.handle_key_event(k),
+                        _ => false,
+                    }
+                },
+                InputMode::Typing(_) => self.handle_typing(&e),
+            };
+
+            if should_exit {
                 return Ok(());
             }
         }
         Ok(())
     }
 
+    fn handle_typing(&mut self, e: &Event) -> bool {
+        match e {
+            Event::Key(k) => {
+                match k.code {
+                    KeyCode::Esc => {
+                        self.input_mode = InputMode::Standard;
+                        self.app_screen = Screen::Main;
+                        self.input_boxes = vec![];
+                        return false;
+                    },
+                    KeyCode::Enter => return true,
+                    KeyCode::Tab => self.next_typing_box(),
+                    _ => { self.input.handle_event(e); false },
+                }
+            }
+            _ => return false,
+        }
+    }
+
+    fn next_typing_box(&mut self) -> bool {
+        let InputMode::Typing(idx) = self.input_mode else {
+            return false
+        };
+
+        self.input_boxes[idx as usize] = self.input.value_and_reset().to_string();
+
+        let new_idx = if idx as usize == self.input_boxes.len() - 1 {
+            0
+        }
+        else {
+            idx + 1
+        };
+
+        self.input = self.input.clone().with_value(self.input_boxes[new_idx as usize].to_string());
+
+        self.input_mode = InputMode::Typing(new_idx);
+
+        return false;
+    }
+
     fn handle_key_event(&mut self, k: KeyEvent) -> bool {
         match k.code {
-            KeyCode::Char('q') => {
+            KeyCode::Char('q') | KeyCode::Esc => {
                 match self.app_screen {
                     Screen::Main => return true,
                     _ => {
@@ -66,7 +119,16 @@ impl<'a> App<'a> {
                 self.tree_state.toggle_selected();
             }
             KeyCode::Char('x') => {
-                self.app_screen = Screen::BranchDelete;
+                let Some(selected) = self.tree_state.selected().last() else {
+                    return false;
+                };
+                if selected.project_type == ProjectItemType::Project
+                {
+                    self.app_screen = Screen::BranchDelete;
+                }
+                else if selected.project_type == ProjectItemType::ProjectWorktree {
+                    self.app_screen = Screen::WorktreeDelete
+                }
                 return false;
             }
             KeyCode::Char('y') => {
@@ -85,10 +147,20 @@ impl<'a> App<'a> {
                 let Some(selected_proj) = self.tree_state.selected().last() else {
                     return false;
                 };
-                match selected_proj.project_type {
-                    ProjectItemType::Project => self.app_screen = Screen::ProjectMenu,
-                    ProjectItemType::ProjectWorktree => self.app_screen = Screen::ProjectWorktreeMenu,
-                    ProjectItemType::ProjectDirectory => self.app_screen = Screen::ProjectDirectoryMenu,
+                match self.app_screen {
+                    Screen::Main => match selected_proj.project_type {
+                        ProjectItemType::Project => self.app_screen = Screen::ProjectMenu,
+                        ProjectItemType::ProjectWorktree => self.app_screen = Screen::ProjectWorktreeMenu,
+                        ProjectItemType::ProjectDirectory => self.app_screen = Screen::ProjectDirectoryMenu,
+                    }
+                    Screen::ProjectMenu => todo!(),
+                    Screen::ProjectWorktreeMenu => todo!(),
+                    Screen::ProjectDirectoryMenu => {
+                        self.app_screen = Screen::CheckoutNewWorktree;
+                        self.input_mode = InputMode::Typing(0);
+                        self.input_boxes = vec![String::new(), String::new()];
+                    },
+                    _ => {}
                 }
             }
             _ => return false
@@ -130,12 +202,12 @@ impl<'a> App<'a> {
                 let to_delete = if self.app_screen == Screen::BranchDelete {
                     "Branch"
                 } else {
-                    "Project"
+                    "Worktree"
                 };
                 let paragraph = Paragraph::new(format!("Delete {} [Y/n]?", to_delete))
                     .centered()
                     .block(block);
-                let pop_area = popup_area(area, 25, 1);
+                let pop_area = popup_list(area, 25, 1);
 
                 frame.render_widget(Clear, pop_area);
                 frame.render_widget(paragraph, pop_area);
@@ -143,10 +215,10 @@ impl<'a> App<'a> {
             Screen::ProjectDirectoryMenu => {
                 block = block.title(format!(" Project Directory: {} ", selected_proj.path.file_name().unwrap().to_string_lossy()));
                 let paragraph = Paragraph::new(vec![Line::styled(">> Checkout New Worktree", Style::default().add_modifier(Modifier::BOLD))])
-                    .left_aligned()
+                    .centered()
                     .block(block);
 
-                let pop_area = popup_area(area, 25, 1);
+                let pop_area = popup_list(area, 25, 1);
                 frame.render_widget(Clear, pop_area);
                 frame.render_widget(paragraph, pop_area);
             }
@@ -160,10 +232,10 @@ impl<'a> App<'a> {
                 let fmt_lines = self.opts_to_lines(&opts);
 
                 let paragraph = Paragraph::new(fmt_lines)
-                    .left_aligned()
+                    .centered()
                     .block(block);
 
-                let pop_area = popup_area(area, 25, opts.len() as u16);
+                let pop_area = popup_list(area, 25, opts.len() as u16);
                 frame.render_widget(Clear, pop_area);
                 frame.render_widget(paragraph, pop_area);
             }
@@ -177,12 +249,72 @@ impl<'a> App<'a> {
                 let fmt_lines = self.opts_to_lines(&opts);
 
                 let paragraph = Paragraph::new(fmt_lines)
-                    .left_aligned()
+                    .centered()
                     .block(block);
 
-                let pop_area = popup_area(area, 25, opts.len() as u16);
+                let pop_area = popup_list(area, 25, opts.len() as u16);
                 frame.render_widget(Clear, pop_area);
                 frame.render_widget(paragraph, pop_area);
+            }
+            Screen::CheckoutNewWorktree => {
+                block = block.title(format!(" Checkout New Worktree "));
+                let pop_area = popup_inputs(area, 50, 20);
+                let box_area = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints(vec![
+                        Constraint::Length(3),
+                        Constraint::Length(pop_area.width - 6),
+                        Constraint::Length(3),
+                    ])
+                    .split(pop_area);
+                let layout = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints(vec![
+                        Constraint::Length((pop_area.height - 6) / 2),
+                        Constraint::Length(3),
+                        Constraint::Length(3),
+                        Constraint::Length((pop_area.height - 6) / 2),
+                    ])
+                    .split(box_area[1]);
+
+                let width = pop_area.width.max(3) - 3;
+                let scroll = self.input.visual_scroll(width as usize);
+
+                let InputMode::Typing(box_idx) = self.input_mode else {
+                    unreachable!()
+                };
+
+                let (input1, input2) = if box_idx == 0 {
+                    let i1 = Paragraph::new(self.input.value())
+                        .style(Style::new().yellow())
+                        .scroll((0, scroll as u16))
+                        .block(Block::bordered().title("Git Repo Link"));
+                    let i2 = Paragraph::new(self.input_boxes[1].clone())
+                        .style(Style::default())
+                        .block(Block::bordered().title("Worktree Name (Blank for Git Repo Name)"));
+                    (i1, i2)
+
+                } else {
+                    let i1 = Paragraph::new(self.input_boxes[0].clone())
+                        .style(Style::default())
+                        .block(Block::bordered().title("Git Repo Link"));
+                    let i2 = Paragraph::new(self.input.value())
+                        .style(Style::new().yellow())
+                        .scroll((0, scroll as u16))
+                        .block(Block::bordered().title("Worktree Name (Blank for Git Repo Name)"));
+                    (i1, i2)
+
+                };
+
+                let paragraph = Paragraph::new("")
+                    .centered()
+                    .block(block);
+
+                frame.render_widget(Clear, pop_area);
+                frame.render_widget(paragraph, pop_area);
+                frame.render_widget(input1, layout[1]);
+                frame.render_widget(input2, layout[2]);
+
             }
             _ => {}
         }
@@ -192,7 +324,7 @@ impl<'a> App<'a> {
         let mut fmt_lines = vec![];
         for (i, opt) in opts.iter().enumerate() {
             if i == self.select_idx as usize {
-                fmt_lines.push(Line::styled(format!(">> {}", opt), Style::default().add_modifier(Modifier::BOLD)));
+                fmt_lines.push(Line::styled(format!(">> {} <<", opt), Style::default().add_modifier(Modifier::BOLD)));
             }
             else {
                 fmt_lines.push(Line::raw(format!("{}", opt)));
@@ -232,8 +364,16 @@ impl<'a> App<'a> {
     }
 }
 
-fn popup_area(area: Rect, percent_x: u16, list_items: u16) -> Rect {
+fn popup_list(area: Rect, percent_x: u16, list_items: u16) -> Rect {
     let vertical = Layout::vertical([Constraint::Length(list_items + 2)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
+}
+
+fn popup_inputs(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
     let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);

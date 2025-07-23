@@ -10,3 +10,10 @@ pub enum Screen {
     ProjectWorktreeMenu,
     ProjectDirectoryMenu,
 }
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub enum InputMode {
+    #[default]
+    Standard,
+    Typing(u8),
+}

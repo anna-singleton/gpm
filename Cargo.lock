@@ -259,6 +259,7 @@ dependencies = [
  "directories",
  "ratatui",
  "serde",
+ "tui-input",
  "tui-tree-widget",
 ]
 
@@ -714,6 +715,16 @@ name = "toml_write"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
+
+[[package]]
+name = "tui-input"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "911e93158bf80bbc94bad533b2b16e3d711e1132d69a6a6980c3920a63422c19"
+dependencies = [
+ "ratatui",
+ "unicode-width 0.2.0",
+]
 
 [[package]]
 name = "tui-tree-widget"
