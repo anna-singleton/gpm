@@ -30,7 +30,7 @@ jobs:
       run: cargo test --release --verbose
     - name: Package Binary
       run: |
-        mv target/release/gpm . && tar czf gpm-linux.tar.gz gpm
+        mv target/release/abn-gpm . && tar czf abn-gpm-linux.tar.gz abn-gpm
 
     - name: Create Release
       id: create_release
@@ -50,8 +50,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./gpm-linux.tar.gz
-        asset_name: gpm-linux.tar.gz
+        asset_path: ./abn-gpm-linux.tar.gz
+        asset_name: abn-gpm-linux.tar.gz
         asset_content_type: application/gzip
 
     - name: "publish to crates.io"
