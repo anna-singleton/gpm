@@ -19,7 +19,8 @@ impl ProjectItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProjectItemType {
-    Project,
-    ProjectWorktree,
+    NonWorktreeRepo,
+    Worktree,
+    WorktreeRepo,
     ProjectDirectory,
 }

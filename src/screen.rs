@@ -1,19 +1,11 @@
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub enum Screen {
     #[default]
     Main,
-    CheckoutNewWorktree,
-    BranchCreate,
+    ScreenSwitchMenu,
+    RepoCreate,
+    RepoDelete,
+    WorktreeCreate,
     WorktreeDelete,
-    BranchDelete,
-    ProjectMenu,
-    ProjectWorktreeMenu,
-    ProjectDirectoryMenu,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-pub enum InputMode {
-    #[default]
-    Standard,
-    Typing(u8),
+    Summary,
 }

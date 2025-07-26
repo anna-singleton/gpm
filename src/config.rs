@@ -2,11 +2,11 @@ use std::{fs::DirEntry, path::PathBuf};
 
 use directories::UserDirs;
 use serde::{Deserialize, Serialize};
-use tui_tree_widget::{Tree, TreeItem};
+use tui_tree_widget::TreeItem;
 
 use crate::project_item::{ProjectItem, ProjectItemType};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     project_directories: Vec<String>,
     standalone_projects: Vec<String>,
@@ -33,7 +33,7 @@ impl Config {
             } else {
                 home_dir.join(PathBuf::from(proj))
             };
-            let tree_item = ProjectItem::new(path.clone(), ProjectItemType::Project);
+            let tree_item = ProjectItem::new(path.clone(), ProjectItemType::NonWorktreeRepo);
             let name: String = path.file_name().unwrap().to_str().unwrap().to_owned();
             forest.push(TreeItem::new_leaf(tree_item, name));
         }
@@ -82,7 +82,7 @@ impl Config {
                         .into_owned();
 
                     children.push(TreeItem::new_leaf(
-                        ProjectItem::new(subdir.path(), ProjectItemType::Project),
+                        ProjectItem::new(subdir.path(), ProjectItemType::Worktree),
                         name,
                     ));
                     continue;
@@ -102,7 +102,7 @@ impl Config {
                         continue;
                     }
                     sub_children.push(TreeItem::new_leaf(
-                        ProjectItem::new(proj_path, ProjectItemType::Project),
+                        ProjectItem::new(proj_path, ProjectItemType::Worktree),
                         name,
                     ));
                 }
@@ -115,15 +115,16 @@ impl Config {
                         .into_owned()
                 });
 
+                let display_name = if sub_children.is_empty() {
+                    format!("▶ {}", subdir.path().file_name().unwrap().to_string_lossy())
+                } else {
+                    subdir.path().file_name().unwrap().to_string_lossy().to_string()
+                };
+
                 children.push(
                     TreeItem::new(
-                        ProjectItem::new(subdir.path(), ProjectItemType::ProjectWorktree),
-                        subdir
-                            .path()
-                            .file_name()
-                            .unwrap()
-                            .to_string_lossy()
-                            .into_owned(),
+                        ProjectItem::new(subdir.path(), ProjectItemType::WorktreeRepo),
+                        display_name,
                         sub_children,
                     )
                     .unwrap(),
@@ -141,7 +142,7 @@ impl Config {
 
             let project_dir_tree_item = TreeItem::new(
                 ProjectItem::new(path.clone(), ProjectItemType::ProjectDirectory),
-                path.file_name().unwrap().to_string_lossy().into_owned(),
+                format!("{}", path.file_name().unwrap().to_string_lossy()),
                 children,
             )
             .unwrap();
