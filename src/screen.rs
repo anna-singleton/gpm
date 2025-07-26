@@ -3,8 +3,10 @@ pub enum Screen {
     #[default]
     Main,
     ScreenSwitchMenu,
-    RepoCreate,
-    RepoDelete,
+    NonWorktreeRepoCreate,
+    NonWorktreeRepoDelete,
+    WorktreeRepoCreate,
+    WorktreeRepoDelete,
     WorktreeCreate,
     WorktreeDelete,
     Summary,

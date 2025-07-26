@@ -82,7 +82,7 @@ impl Config {
                         .into_owned();
 
                     children.push(TreeItem::new_leaf(
-                        ProjectItem::new(subdir.path(), ProjectItemType::Worktree),
+                        ProjectItem::new(subdir.path(), ProjectItemType::NonWorktreeRepo),
                         name,
                     ));
                     continue;
