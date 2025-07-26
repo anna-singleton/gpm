@@ -30,7 +30,7 @@ jobs:
       run: cargo test --release --verbose
     - name: Package Binary
       run: |
-        mv target/release/gpm . && tar czf runfast-linux.tar.gz runfast
+        mv target/release/gpm . && tar czf gpm-linux.tar.gz gpm
 
     - name: Create Release
       id: create_release
